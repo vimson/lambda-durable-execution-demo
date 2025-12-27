@@ -1,0 +1,8 @@
+node_modules
+dist
+.esbuild
+.serverless
+coverage
+*.log
+.env
+.env.*

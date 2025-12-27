@@ -1,0 +1,7 @@
+Welcome {{name}}!
+
+Thank you for joining us.
+
+Please verify email: {{verificationUrl}}
+
+This link expires in 24 hours.

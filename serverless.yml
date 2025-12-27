@@ -1,0 +1,178 @@
+service: lambda-durable-execution-demo
+configValidationMode: warn
+frameworkVersion: '4'
+useDotenv: true
+
+build:
+  esbuild:
+    platform: node
+    target: node22
+    sourcemap: true
+    bundle: true
+    minify: false
+    exclude:
+      - '@aws-sdk/*'
+      - '!@aws-sdk/client-lambda'
+
+custom:
+  stage: ${opt:stage, 'dev'}
+
+provider:
+  name: aws
+  region: eu-west-1
+  stage: ${self:custom.stage}
+  runtime: nodejs22.x
+  memorySize: 512
+  timeout: 10
+  logRetentionInDays: 90
+  logs:
+    httpApi: true
+  httpApi:
+    # metrics: true # Enable if you need
+    cors: true
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+          Resource:
+            - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-*
+        - Effect: Allow
+          Action:
+            - lambda:SendDurableExecutionCallbackSuccess
+            - lambda:SendDurableExecutionCallbackFailure
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:GetItem
+            - dynamodb:Query
+          Resource:
+            - !GetAtt Table.Arn
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendTemplatedEmail
+            - ses:CreateTemplate
+          Resource: "*"
+
+functions:
+  customerRegister:
+    handler: src/handlers/customers/register.handler
+    events:
+      - httpApi:
+          path: "/register"
+          method: POST
+    environment:
+      TABLE_NAME: !Ref Table
+      REGISTER_WORKFLOW_FUNCTION_ARN: !GetAtt CustomerRegisterWorkflowLambdaFunction.Arn
+  
+  customerRegisterWorkflow:
+    handler: src/handlers/customers/register-workflow.handler
+    durableConfig:
+      executionTimeout: 86400 # # 24 hours. Maximum execution time in seconds (up to 366 days)
+      retentionPeriodInDays: 7 # Optional. How long to retain execution history (1-90 days, default: 14)
+    environment:
+      TABLE_NAME: !Ref Table
+      EMAIL_VERIFICATION_SECRET: ${env:EMAIL_VERIFICATION_SECRET}
+      FROM_EMAIL: ${env:FROM_EMAIL}
+      API_URL: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  
+  customerEmailVerification:
+    handler: src/handlers/customers/verify-email.handler
+    events:
+      - httpApi:
+          path: "/verify"
+          method: GET
+    environment:
+      TABLE_NAME: !Ref Table
+      EMAIL_VERIFICATION_SECRET: ${env:EMAIL_VERIFICATION_SECRET}
+
+resources:
+  Resources:
+    Table:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-table
+        BillingMode: PAY_PER_REQUEST
+        Tags:
+          - Key: Backup
+            Value: daily-weekly-3month-retention
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: GSI1PK
+            AttributeType: S
+          - AttributeName: GSI1SK
+            AttributeType: S
+          - AttributeName: GSI2PK
+            AttributeType: S
+          - AttributeName: GSI2SK
+            AttributeType: S
+          - AttributeName: GSI3PK
+            AttributeType: S
+          - AttributeName: GSI3SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: GSI1PK
+                KeyType: HASH
+              - AttributeName: GSI1SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'ALL'
+          - IndexName: GSI2
+            KeySchema:
+              - AttributeName: GSI2PK
+                KeyType: HASH
+              - AttributeName: GSI2SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'ALL'
+          - IndexName: GSI3
+            KeySchema:
+              - AttributeName: GSI3PK
+                KeyType: HASH
+              - AttributeName: GSI3SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: 'ALL'
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+    
+    VerificationEmailTemplate:
+      Type: AWS::SES::Template
+      Properties:
+        Template:
+          TemplateName: VerificationEmail
+          SubjectPart: ${file(./src/templates/verification-email/subject.txt)}
+          HtmlPart: ${file(./src/templates/verification-email/welcome.html)}
+          TextPart: ${file(./src/templates/verification-email/welcome.txt)}
+
+outputs:
+  # DynamoDB
+  TableName:
+    Description: "DynamoDB Table Name"
+    Value:
+      Ref: Table
+  TableArn:
+    Description: "DynamoDB Table ARN"
+    Value:
+      Fn::GetAtt: [Table, Arn]
+
+  # API Endpoint
+  ApiEndpoint:
+    Description: "HTTP API Endpoint URL"
+    Value:
+      Fn::Sub: "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"

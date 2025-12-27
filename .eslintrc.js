@@ -1,0 +1,65 @@
+module.exports = {
+  root: true,
+  env: {
+    node: true,
+    es2022: true,
+    jest: true,
+  },
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    ecmaVersion: 2022,
+    sourceType: 'module',
+  },
+  plugins: [
+    '@typescript-eslint',
+    'simple-import-sort',
+    'unused-imports',
+    'prettier',
+    'jest',
+    'jest-formatting',
+    'import',
+  ],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:jest/recommended',
+    'plugin:jest-formatting/recommended',
+    'prettier',
+  ],
+  overrides: [
+    {
+      files: ['*.ts', '*.tsx'],
+      parserOptions: {
+        project: './tsconfig.json',
+      },
+    },
+  ],
+  rules: {
+    'simple-import-sort/imports': 'error',
+    'simple-import-sort/exports': 'error',
+    'unused-imports/no-unused-imports': 'error',
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      },
+    ],
+    'import/no-extraneous-dependencies': 'error',
+    'prettier/prettier': 'error',
+    'class-methods-use-this': 'off',
+    'import/prefer-default-export': 'off',
+    'object-curly-newline': 'off',
+    'operator-linebreak': 'off',
+    'no-console': 'error',
+    'no-param-reassign': 'off',
+    'implicit-arrow-linebreak': 'off',
+    'function-paren-newline': 'off',
+    'max-len': ['error', { code: 180 }],
+    'import/no-unresolved': 'off',
+    semi: [2, 'always'],
+    'import/no-cycle': 'off',
+    indent: [2, 2, { SwitchCase: 1 }],
+  },
+  ignorePatterns: ['dist', '.serverless', '.esbuild', 'node_modules', 'coverage'],
+};
