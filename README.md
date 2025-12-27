@@ -1,4 +1,8 @@
+
+
 # Building a Customer Registration Workflow with AWS Lambda Durable Functions (TypeScript)
+
+Note: This code is for demo purpose only
 
 Modern user registration flows are no longer simple “insert a record and return 200 OK”.
 They often involve **multiple asynchronous steps**, external systems, and **human interaction** (like email verification).
